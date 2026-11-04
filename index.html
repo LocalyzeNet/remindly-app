@@ -52,7 +52,6 @@
       const [now, setNow] = useState(new Date());
       const [activeAlarm, setActiveAlarm] = useState(null);
       
-      // Modals States
       const [isProfileOpen, setIsProfileOpen] = useState(false);
       const [isAppointmentOpen, setIsAppointmentOpen] = useState(false);
 
@@ -159,7 +158,6 @@
         setTenants(tenants.map(t => t.id === updated.id ? updated : t));
       };
 
-      // Handle Image Upload from Local Files
       const handleImageUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -183,4 +181,316 @@
 
       const handleAddAppointment = (e) => {
         e.preventDefault();
-        if (!formData.customerName || !formData.phone || !
+        if (!formData.customerName || !formData.phone || !formData.date || !formData.time) return;
+
+        const cleanPhone = formData.phone.replace(/\D/g, "");
+        const waValid = cleanPhone.length >= 10;
+
+        let updatedApps;
+        if (formData.id) {
+          updatedApps = currentTenant.appointments.map(a => a.id === formData.id ? { ...formData, waValid } : a);
+        } else {
+          updatedApps = [...currentTenant.appointments, { ...formData, id: Date.now(), status: "Pending", waValid }];
+        }
+        
+        updateTenantData({ appointments: updatedApps });
+        setFormData({ id: null, customerName: "", phone: "", date: "", time: "", offset: "2h" });
+        setIsAppointmentOpen(false);
+      };
+
+      const markAppointmentStatus = (appId, newStatus) => {
+        const updatedApps = currentTenant.appointments.map(a => 
+          a.id === appId ? { ...a, status: newStatus } : a
+        );
+        updateTenantData({ appointments: updatedApps });
+        setActiveAlarm(null);
+      };
+
+      const generateMessage = (app) => {
+        return currentTenant.messageTemplate
+          .replace(/{customerName}/g, app.customerName)
+          .replace(/{businessName}/g, currentTenant.businessName)
+          .replace(/{date}/g, app.date)
+          .replace(/{time}/g, app.time);
+      };
+
+      return (
+        <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+          
+          <header className="bg-white rounded-3xl shadow-sm border border-emerald-100 p-6 flex flex-wrap justify-between items-center gap-4">
+            <div className="flex items-center gap-4">
+              <img src={currentTenant.logoUrl} alt="Logo" className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-500 shadow-sm" />
+              <div>
+                <h1 className="text-2xl font-black text-slate-900">{currentTenant.businessName}</h1>
+                <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Συνδρομητής SaaS • Ενεργός</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsProfileOpen(true)}
+                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold px-4 py-2.5 rounded-2xl text-sm transition flex items-center gap-2 border border-emerald-200"
+              >
+                ⚙️ Ρυθμίσεις & Προφίλ
+              </button>
+              <button 
+                onClick={() => setCurrentTenant(null)}
+                className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 font-bold px-4 py-2.5 rounded-2xl text-sm transition border border-slate-200"
+              >
+                🚪 Έξοδος
+              </button>
+            </div>
+          </header>
+
+          <div className="flex justify-between items-center bg-white p-6 rounded-3xl shadow-sm border border-emerald-100">
+            <div>
+              <h2 className="text-xl font-black text-slate-900">Διαχείριση Ραντεβού</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Οργανώστε τους πελάτες σας και αυτοματοποιήστε τις ειδοποιήσεις.</p>
+            </div>
+            <button 
+              onClick={() => { setFormData({ id: null, customerName: "", phone: "", date: "", time: "", offset: "2h" }); setIsAppointmentOpen(true); }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-emerald-600/20 transition flex items-center gap-2"
+            >
+              ➕ Νέο Ραντεβού
+            </button>
+          </div>
+
+          <section className="bg-white rounded-3xl shadow-sm border border-emerald-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-emerald-50/50 text-emerald-900 text-xs uppercase font-black border-b border-emerald-100">
+                    <th className="p-4 pl-6">Πελάτης</th>
+                    <th className="p-4">Τηλέφωνο</th>
+                    <th className="p-4">Ημερομηνία & Ώρα</th>
+                    <th className="p-4">Ειδοποίηση</th>
+                    <th className="p-4">Live Feed (WhatsApp & Status)</th>
+                    <th className="p-4 text-center pr-6">Ενέργεια</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {currentTenant.appointments.map((app) => (
+                    <tr key={app.id} className="hover:bg-slate-50/80 transition">
+                      <td className="p-4 pl-6 font-bold text-slate-900">{app.customerName}</td>
+                      <td className="p-4 text-slate-600 font-medium">{app.phone}</td>
+                      <td className="p-4 font-semibold text-slate-800">{app.date} | {app.time}</td>
+                      <td className="p-4 text-emerald-700 font-bold bg-emerald-50/30">-{app.offset}</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {app.waValid ? (
+                            <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-1 rounded-full flex items-center gap-1">
+                              🟢 WhatsApp Active
+                            </span>
+                          ) : (
+                            <span className="bg-amber-100 text-amber-800 text-xs font-black px-2.5 py-1 rounded-full">
+                              ⚠️ No WhatsApp
+                            </span>
+                          )}
+
+                          {app.status === "Pending" && (
+                            <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-full">
+                              ⏳ Pending
+                            </span>
+                          )}
+                          {app.status === "Sent" && (
+                            <span className="bg-emerald-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
+                              ✓ Sent
+                            </span>
+                          )}
+                          {app.status === "Dismissed" && (
+                            <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                              Dismissed
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center pr-6">
+                        <a 
+                          href={`https://wa.me/${app.phone}?text=${encodeURIComponent(generateMessage(app))}`}
+                          target="_blank"
+                          onClick={() => markAppointmentStatus(app.id, "Sent")}
+                          className="bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-sm px-4 py-2 rounded-xl inline-flex items-center gap-1 text-xs transition"
+                        >
+                          💬 WhatsApp
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                  {currentTenant.appointments.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="p-12 text-center text-slate-400 font-medium">Δεν υπάρχουν ενεργά ραντεβού. Πατήστε «➕ Νέο Ραντεβού».</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {isProfileOpen && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center p-4 z-50">
+              <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-6">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <h3 className="text-xl font-black text-slate-900">⚙️ Ρυθμίσεις Προφίλ & Μηνυμάτων</h3>
+                  <button onClick={() => setIsProfileOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+                </div>
+                
+                <form onSubmit={handleSaveSettings} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Όνομα Επιχείρησης</label>
+                    <input 
+                      type="text" required
+                      value={settingsData.businessName}
+                      onChange={(e) => setSettingsData({...settingsData, businessName: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Φωτογραφία Λογότυπου (Επιλογή από αρχεία)</label>
+                    <input 
+                      type="file" accept="image/*"
+                      onChange={handleImageUpload}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-2.5 text-xs text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Πρότυπο Μηνύματος WhatsApp 
+                      <span className="text-emerald-600 font-normal ml-1">(&#123;customerName&#125;, &#123;businessName&#125;, &#123;date&#125;, &#123;time&#125;)</span>
+                    </label>
+                    <textarea 
+                      rows="3" required
+                      value={settingsData.messageTemplate}
+                      onChange={(e) => setSettingsData({...settingsData, messageTemplate: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setIsProfileOpen(false)} className="px-5 py-2.5 bg-slate-100 font-bold rounded-2xl text-sm">Άκυρο</button>
+                    <button type="submit" className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-sm shadow-lg shadow-emerald-600/20">Αποθήκευση</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {isAppointmentOpen && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center p-4 z-50">
+              <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-emerald-100 space-y-6">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <h3 className="text-xl font-black text-slate-900">➕ Προσθήκη Νέου Ραντεβού</h3>
+                  <button onClick={() => setIsAppointmentOpen(false)} className="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+                </div>
+
+                <form onSubmit={handleAddAppointment} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Όνομα Πελάτη</label>
+                    <input 
+                      type="text" required placeholder="π.χ. Κώστας Παπαδόπουλος"
+                      value={formData.customerName}
+                      onChange={(e) => setFormData({...formData, customerName: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Τηλέφωνο (Live WhatsApp Check)</label>
+                    <input 
+                      type="text" required placeholder="6912345678"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Ημερομηνία</label>
+                      <input 
+                        type="date" required
+                        value={formData.date}
+                        onChange={(e) => setFormData({...formData, date: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Ώρα</label>
+                      <input 
+                        type="time" required
+                        value={formData.time}
+                        onChange={(e) => setFormData({...formData, time: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-medium outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Χρονοδιακόπτης Ειδοποίησης</label>
+                    <select 
+                      value={formData.offset}
+                      onChange={(e) => setFormData({...formData, offset: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="15m">15 λεπτά πριν</option>
+                      <option value="30m">30 λεπτά πριν</option>
+                      <option value="1h">1 ώρα πριν</option>
+                      <option value="2h">2 ώρες πριν</option>
+                      <option value="3h">3 ώρες πριν</option>
+                      <option value="24h">24 ώρες πριν</option>
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setIsAppointmentOpen(false)} className="px-5 py-2.5 bg-slate-100 font-bold rounded-2xl text-sm">Άκυρο</button>
+                    <button type="submit" className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-sm shadow-lg shadow-emerald-600/20">Καταχώρηση</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {activeAlarm && (
+            <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex justify-center items-center p-4 z-50">
+              <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border-4 border-emerald-500 space-y-6 text-center">
+                <div>
+                  <span className="text-6xl">🔔</span>
+                  <h3 className="text-2xl font-black text-slate-900 mt-2">Ώρα για Υπενθύμιση!</h3>
+                  <p className="text-xs text-emerald-600 font-bold uppercase mt-1">Αυτόματη Ειδοποίηση Ραντεβού</p>
+                </div>
+                
+                <div className="bg-emerald-50/50 rounded-2xl p-4 text-left space-y-2 border border-emerald-100">
+                  <p className="text-sm font-bold text-slate-900">👤 Πελάτης: <span className="font-normal text-slate-700">{activeAlarm.customerName}</span></p>
+                  <p className="text-sm font-bold text-slate-900">📞 Τηλέφωνο: <span className="font-normal text-slate-700">{activeAlarm.phone}</span></p>
+                  <p className="text-sm font-bold text-slate-900">🕒 Ραντεβού: <span className="font-normal text-slate-700">{activeAlarm.time} ({activeAlarm.date})</span></p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <a 
+                    href={`https://wa.me/${activeAlarm.phone}?text=${encodeURIComponent(generateMessage(activeAlarm))}`}
+                    target="_blank"
+                    onClick={() => markAppointmentStatus(activeAlarm.id, "Sent")}
+                    className="bg-emerald-600 text-white font-black text-center py-4 rounded-2xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 transition"
+                  >
+                    💬 Αποστολή WhatsApp Τώρα
+                  </a>
+                  <button 
+                    onClick={() => markAppointmentStatus(activeAlarm.id, "Dismissed")} 
+                    className="bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold py-3 rounded-2xl transition text-sm"
+                  >
+                    Κλείσιμο (Dismiss)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
