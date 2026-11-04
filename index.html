@@ -16,7 +16,6 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
 
-    // ΠΟΣΟΙ ΠΕΛΑΤΕΣ-ΕΠΙΧΕΙΡΗΣΕΙΣ ΥΠΑΡΧΟΥΝ ΣΤΗΝ ΠΛΑΤΦΟΡΜΑ ΣΟΥ (DATABASE SIMULATION)
     const INITIAL_TENANTS = [
       {
         id: "barber_nikos",
@@ -24,10 +23,10 @@
         password: "123",
         businessName: "Nikos Barber Shop",
         logoUrl: "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=150&auto=format&fit=crop&q=80",
-        isActive: true, // Εδώ εσύ ελέγχεις αν πληρώνει! (true = ενεργός, false = κόπηκε λόγω μη πληρωμής)
-        messageTemplate: "Γεια σου {customerName}! Υπενθύμιση για το ραντεβού σου στο {businessName} στις {time}.",
+        isActive: true,
+        messageTemplate: "Γεια σου {customerName}! Υπενθύμιση για το ραντεβού σου στο {businessName} στις {time} ({date}).",
         appointments: [
-          { id: 1, customerName: "Γιώργος Παπαδόπουλος", phone: "6912345678", date: "2026-11-04", time: "19:30", offset: "15m", status: "Pending" }
+          { id: 1, customerName: "Γιώργος Παπαδόπουλος", phone: "6912345678", date: "2026-11-04", time: "19:30", offset: "2h", status: "Pending" }
         ]
       },
       {
@@ -36,15 +35,15 @@
         password: "123",
         businessName: "Maria's Beauty Salon",
         logoUrl: "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=150&auto=format&fit=crop&q=80",
-        isActive: false, // ΠΑΡΑΔΕΙΓΜΑ: Αυτός ο πελάτης ΔΕΝ πλήρωσε τη συνδρομή του!
-        messageTemplate: "Γεια σου {customerName}! Σε περιμένουμε στο {businessName}.",
+        isActive: false,
+        messageTemplate: "Γεια σου {customerName}! Σας περιμένουμε στο {businessName}.",
         appointments: []
       }
     ];
 
     function App() {
       const [tenants, setTenants] = useState(INITIAL_TENANTS);
-      const [currentTenant, setCurrentTenant] = useState(null); // Ποιος είναι συνδεδεμένος τώρα
+      const [currentTenant, setCurrentTenant] = useState(null);
       
       const [loginUser, setLoginUser] = useState("");
       const [loginPass, setLoginPass] = useState("");
@@ -52,23 +51,29 @@
 
       const [now, setNow] = useState(new Date());
       const [activeAlarm, setActiveAlarm] = useState(null);
-      const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+      
+      const [formData, setFormData] = useState({ id: null, customerName: "", phone: "", date: "", time: "", offset: "2h" });
+      const [settingsData, setSettingsData] = useState({ businessName: "", logoUrl: "", messageTemplate: "" });
 
-      const [formData, setFormData] = useState({ id: null, customerName: "", phone: "", date: "", time: "", offset: "15m" });
-
-      // Live Timer
       useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 1000);
         return () => clearInterval(timer);
       }, []);
 
-      // Real-Time Alarm Checker για τον τρέχοντα χρήστη
       useEffect(() => {
         if (!currentTenant || !currentTenant.isActive) return;
         currentTenant.appointments.forEach(app => {
           if (app.status === "Sent") return;
           const appTime = new Date(`${app.date}T${app.time}`);
-          let offsetMins = app.offset === "30m" ? 30 : app.offset === "1h" ? 60 : app.offset === "2h" ? 120 : 15;
+          
+          let offsetMins = 120;
+          if (app.offset === "15m") offsetMins = 15;
+          if (app.offset === "30m") offsetMins = 30;
+          if (app.offset === "1h") offsetMins = 60;
+          if (app.offset === "2h") offsetMins = 120;
+          if (app.offset === "3h") offsetMins = 180;
+          if (app.offset === "24h") offsetMins = 1440;
+
           const triggerTime = new Date(appTime.getTime() - offsetMins * 60000);
 
           if (now >= triggerTime && now < appTime && !activeAlarm) {
@@ -77,7 +82,6 @@
         });
       }, [now, currentTenant]);
 
-      // Handle Login
       const handleLogin = (e) => {
         e.preventDefault();
         const found = tenants.find(t => t.username === loginUser && t.password === loginPass);
@@ -87,6 +91,11 @@
             return;
           }
           setCurrentTenant(found);
+          setSettingsData({
+            businessName: found.businessName,
+            logoUrl: found.logoUrl,
+            messageTemplate: found.messageTemplate
+          });
           setLoginError("");
         } else {
           setLoginError("Λάθος όνομα χρήστη ή κωδικός.");
@@ -95,62 +104,64 @@
 
       if (!currentTenant) {
         return (
-          <div class="min-h-screen flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 max-w-md w-full">
-              <div class="text-center mb-6">
-                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Remindly SaaS</h1>
-                <p class="text-sm text-slate-500 mt-1">Σύνδεση Συνδρομητή-Επιχείρησης</p>
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8 max-w-md w-full">
+              <div className="text-center mb-6">
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Remindly SaaS</h1>
+                <p className="text-sm text-slate-500 mt-1">Σύνδεση Συνδρομητή-Επιχείρησης</p>
               </div>
 
               {loginError && (
-                <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-sm font-semibold mb-4 text-center">
+                <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-xl text-sm font-semibold mb-4 text-center">
                   {loginError}
                 </div>
               )}
 
-              <form onSubmit={handleLogin} class="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Username επιχείρησης</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Username επιχείρησης</label>
                   <input 
-                    type="text" 
-                    required
-                    placeholder="π.χ. nikos ή maria"
-                    value={loginUser}
-                    onChange={(e) => setLoginUser(e.target.value)}
-                    class="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-slate-900"
+                    type="text" required placeholder="π.χ. nikos ή maria"
+                    value={loginUser} onChange={(e) => setLoginUser(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-slate-900"
                   />
                 </div>
                 <div>
-                  <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Κωδικός Πρόσβασης</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Κωδικός Πρόσβασης</label>
                   <input 
-                    type="password" 
-                    required
-                    placeholder="••••"
-                    value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
-                    class="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-slate-900"
+                    type="password" required placeholder="••••"
+                    value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 p-3 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-slate-900"
                   />
                 </div>
-                <button type="submit" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-black transition">
+                <button type="submit" className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-black transition">
                   Είσοδος στο Dashboard
                 </button>
               </form>
 
-              <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
-                <p class="font-bold mb-1">Demo Accounts για δοκιμή:</p>
-                <p>1ος (Ενεργός): <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">nikos / 123</code></p>
-                <p class="mt-1">2ος (Ληγμένη Συνδρομή): <code class="bg-slate-100 px-1 py-0.5 rounded text-slate-800">maria / 123</code></p>
+              <div className="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
+                <p className="font-bold mb-1">Demo Accounts:</p>
+                <p>1ος (Ενεργός): <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">nikos / 123</code></p>
               </div>
             </div>
           </div>
         );
       }
 
-      // ── ΕΔΩ ΕΙΝΑΙ ΤΟ DASHBOARD ΤΟΥ ΠΕΛΑΤΗ ΠΟΥ ΕΧΕΙ ΣΥΝΔΕΘΕΙ ──
-      const updateCurrentTenantAppointments = (newApps) => {
-        const updated = { ...currentTenant, appointments: newApps };
+      const updateTenantData = (updatedFields) => {
+        const updated = { ...currentTenant, ...updatedFields };
         setCurrentTenant(updated);
         setTenants(tenants.map(t => t.id === updated.id ? updated : t));
+      };
+
+      const handleSaveSettings = (e) => {
+        e.preventDefault();
+        updateTenantData({
+          businessName: settingsData.businessName,
+          logoUrl: settingsData.logoUrl,
+          messageTemplate: settingsData.messageTemplate
+        });
+        alert("✅ Οι ρυθμίσεις αποθηκεύτηκαν επιτυχώς!");
       };
 
       const handleAddAppointment = (e) => {
@@ -163,129 +174,176 @@
         } else {
           updatedApps = [...currentTenant.appointments, { ...formData, id: Date.now(), status: "Pending" }];
         }
-        updateCurrentTenantAppointments(updatedApps);
-        setFormData({ id: null, customerName: "", phone: "", date: "", time: "", offset: "15m" });
+        updateTenantData({ appointments: updatedApps });
+        setFormData({ id: null, customerName: "", phone: "", date: "", time: "", offset: "2h" });
       };
 
       const generateMessage = (app) => {
         return currentTenant.messageTemplate
-          .replace("{customerName}", app.customerName)
-          .replace("{businessName}", currentTenant.businessName)
-          .replace("{date}", app.date)
-          .replace("{time}", app.time);
+          .replace(/{customerName}/g, app.customerName)
+          .replace(/{businessName}/g, currentTenant.businessName)
+          .replace(/{date}/g, app.date)
+          .replace(/{time}/g, app.time);
       };
 
       return (
-        <div class="max-w-6xl mx-auto p-4 md:p-8">
+        <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
           
           {/* HEADER */}
-          <header class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8 flex flex-wrap justify-between items-center gap-4">
-            <div class="flex items-center gap-4">
-              <img src={currentTenant.logoUrl} alt="Logo" class="w-14 h-14 rounded-full object-cover border-2 border-emerald-500 shadow-sm" />
+          <header className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-wrap justify-between items-center gap-4">
+            <div className="flex items-center gap-4">
+              <img src={currentTenant.logoUrl} alt="Logo" className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500 shadow-sm" />
               <div>
-                <h1 class="text-2xl font-black text-slate-900">{currentTenant.businessName}</h1>
-                <p class="text-xs font-semibold text-emerald-600 uppercase">Ενεργός Συνδρομητής SaaS</p>
+                <h1 className="text-2xl font-black text-slate-900">{currentTenant.businessName}</h1>
+                <p className="text-xs font-semibold text-emerald-600 uppercase">Ενεργός Συνδρομητής SaaS</p>
               </div>
             </div>
 
-            <div class="flex items-center gap-3">
-              <button 
-                onClick={() => setCurrentTenant(null)}
-                class="bg-red-50 text-red-600 hover:bg-red-100 font-bold px-4 py-2 rounded-xl text-sm border border-red-200 transition"
-              >
-                🚪 Αποσύνδεση (Logout)
-              </button>
-            </div>
+            <button 
+              onClick={() => setCurrentTenant(null)}
+              className="bg-red-50 text-red-600 hover:bg-red-100 font-bold px-4 py-2 rounded-xl text-sm border border-red-200 transition"
+            >
+              🚪 Αποσύνδεση
+            </button>
           </header>
 
-          {/* FORM: ΝΕΟ ΡΑΝΤΕΒΟΥ */}
-          <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
-            <h2 class="text-lg font-bold text-slate-900 mb-4">
-              {formData.id ? "✏️ Επεξεργασία Ραντεβού" : "➕ Νέο Ραντεβού Πελάτη"}
-            </h2>
-            <form onSubmit={handleAddAppointment} class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+          {/* SETTINGS */}
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">⚙️ Ρυθμίσεις Επιχείρησης & Αυτοματισμού Μηνυμάτων</h2>
+            <form onSubmit={handleSaveSettings} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Όνομα Επιχείρησης</label>
+                  <input 
+                    type="text" required
+                    value={settingsData.businessName}
+                    onChange={(e) => setSettingsData({...settingsData, businessName: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">URL Λογότυπου (Εικόνας)</label>
+                  <input 
+                    type="text" required
+                    value={settingsData.logoUrl}
+                    onChange={(e) => setSettingsData({...settingsData, logoUrl: e.target.value})}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                  />
+                </div>
+              </div>
+
               <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Όνομα Πελάτη</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Πρότυπο Αυτοματοποιημένου Μηνύματος WhatsApp 
+                  <span className="text-slate-400 font-normal ml-2">(Χρησιμοποιήστε: &#123;customerName&#125;, &#123;businessName&#125;, &#123;date&#125;, &#123;time&#125;)</span>
+                </label>
+                <textarea 
+                  rows="2" required
+                  value={settingsData.messageTemplate}
+                  onChange={(e) => setSettingsData({...settingsData, messageTemplate: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end">
+                <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl shadow text-sm">
+                  💾 Αποθήκευση Ρυθμίσεων
+                </button>
+              </div>
+            </form>
+          </section>
+
+          {/* FORM: ΝΕΟ ΡΑΝΤΕΒΟΥ */}
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">➕ Νέο Ραντεβού Πελάτη</h2>
+            <form onSubmit={handleAddAppointment} className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Όνομα Πελάτη</label>
                 <input 
                   type="text" required placeholder="π.χ. Κώστας"
                   value={formData.customerName}
                   onChange={(e) => setFormData({...formData, customerName: e.target.value})}
-                  class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
                 />
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Τηλέφωνο</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Τηλέφωνο</label>
                 <input 
                   type="text" required placeholder="6912345678"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
                 />
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Ημερομηνία</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Ημερομηνία</label>
                 <input 
                   type="date" required
                   value={formData.date}
                   onChange={(e) => setFormData({...formData, date: e.target.value})}
-                  class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
                 />
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Ώρα</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Ώρα</label>
                 <input 
                   type="time" required
                   value={formData.time}
                   onChange={(e) => setFormData({...formData, time: e.target.value})}
-                  class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm"
                 />
               </div>
               <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Ειδοποίηση</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Ειδοποίηση Πριν</label>
                 <select 
                   value={formData.offset}
                   onChange={(e) => setFormData({...formData, offset: e.target.value})}
-                  class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm font-semibold"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-sm font-semibold"
                 >
-                  <option value="15m">15λ πριν</option>
-                  <option value="30m">30λ πριν</option>
-                  <option value="1h">1ώ πριν</option>
+                  <option value="15m">15 λεπτά</option>
+                  <option value="30m">30 λεπτά</option>
+                  <option value="1h">1 ώρα</option>
+                  <option value="2h">2 ώρες</option>
+                  <option value="3h">3 ώρες</option>
+                  <option value="24h">24 ώρες</option>
                 </select>
               </div>
               <div>
-                <button type="submit" class="w-full bg-slate-900 text-white font-bold hover:bg-black px-4 py-2.5 rounded-lg shadow">
-                  {formData.id ? "Αποθήκευση" : "+ Προσθήκη"}
+                <button type="submit" className="w-full bg-slate-900 text-white font-bold hover:bg-black px-4 py-2.5 rounded-lg shadow">
+                  + Προσθήκη
                 </button>
               </div>
             </form>
           </section>
 
           {/* TABLE */}
-          <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-6 border-b border-slate-200">
-              <h2 class="text-lg font-bold text-slate-900">📋 Λίστα Ραντεβού Επιχείρησης</h2>
+          <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-900">📋 Λίστα Ραντεβού Επιχείρησης</h2>
             </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left border-collapse">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr class="bg-slate-100 text-slate-700 text-xs uppercase font-bold border-b border-slate-200">
-                    <th class="p-4">Πελάτης</th>
-                    <th class="p-4">Τηλέφωνο</th>
-                    <th class="p-4">Ημερομηνία & Ώρα</th>
-                    <th class="p-4 text-center">WhatsApp</th>
+                  <tr className="bg-slate-100 text-slate-700 text-xs uppercase font-bold border-b border-slate-200">
+                    <th className="p-4">Πελάτης</th>
+                    <th className="p-4">Τηλέφωνο</th>
+                    <th className="p-4">Ημερομηνία & Ώρα</th>
+                    <th className="p-4">Ειδοποίηση</th>
+                    <th className="p-4 text-center">WhatsApp</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-200 text-sm">
+                <tbody className="divide-y divide-slate-200 text-sm">
                   {currentTenant.appointments.map((app) => (
-                    <tr key={app.id} class="hover:bg-slate-50">
-                      <td class="p-4 font-bold text-slate-900">{app.customerName}</td>
-                      <td class="p-4 text-slate-600">{app.phone}</td>
-                      <td class="p-4 font-semibold text-slate-800">{app.date} | {app.time}</td>
-                      <td class="p-4 text-center">
+                    <tr key={app.id} className="hover:bg-slate-50">
+                      <td className="p-4 font-bold text-slate-900">{app.customerName}</td>
+                      <td className="p-4 text-slate-600">{app.phone}</td>
+                      <td className="p-4 font-semibold text-slate-800">{app.date} | {app.time}</td>
+                      <td className="p-4 text-slate-500 font-medium">-{app.offset}</td>
+                      <td className="p-4 text-center">
                         <a 
                           href={`https://wa.me/${app.phone}?text=${encodeURIComponent(generateMessage(app))}`}
                           target="_blank"
-                          class="bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow px-4 py-2 rounded-lg inline-flex items-center gap-1"
+                          className="bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow px-4 py-2 rounded-lg inline-flex items-center gap-1"
                         >
                           💬 Στείλε WhatsApp
                         </a>
@@ -294,7 +352,7 @@
                   ))}
                   {currentTenant.appointments.length === 0 && (
                     <tr>
-                      <td colSpan="4" class="p-8 text-center text-slate-400">Δεν υπάρχουν ενεργά ραντεβού.</td>
+                      <td colSpan="5" className="p-8 text-center text-slate-400">Δεν υπάρχουν ενεργά ραντεβού.</td>
                     </tr>
                   )}
                 </tbody>
@@ -304,26 +362,26 @@
 
           {/* ALARM MODAL */}
           {activeAlarm && (
-            <div class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex justify-center items-center p-4 z-50">
-              <div class="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border-4 border-emerald-500">
-                <div class="text-center mb-6">
-                  <span class="text-5xl">🔔</span>
-                  <h3 class="text-2xl font-black text-slate-900 mt-2">Ώρα για Υπενθύμιση!</h3>
+            <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex justify-center items-center p-4 z-50">
+              <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl border-4 border-emerald-500">
+                <div className="text-center mb-6">
+                  <span className="text-5xl">🔔</span>
+                  <h3 className="text-2xl font-black text-slate-900 mt-2">Ώρα για Υπενθύμιση!</h3>
                 </div>
-                <div class="bg-slate-100 rounded-2xl p-4 mb-6 space-y-2">
-                  <p class="text-sm font-bold text-slate-900">👤 Πελάτης: <span class="font-normal">{activeAlarm.customerName}</span></p>
-                  <p class="text-sm font-bold text-slate-900">🕒 Ώρα: <span class="font-normal">{activeAlarm.time}</span></p>
+                <div className="bg-slate-100 rounded-2xl p-4 mb-6 space-y-2">
+                  <p className="text-sm font-bold text-slate-900">👤 Πελάτης: <span className="font-normal">{activeAlarm.customerName}</span></p>
+                  <p className="text-sm font-bold text-slate-900">🕒 Ώρα Ραντεβού: <span className="font-normal">{activeAlarm.time} ({activeAlarm.date})</span></p>
                 </div>
-                <div class="flex flex-col gap-3">
+                <div className="flex flex-col gap-3">
                   <a 
                     href={`https://wa.me/${activeAlarm.phone}?text=${encodeURIComponent(generateMessage(activeAlarm))}`}
                     target="_blank"
                     onClick={() => setActiveAlarm(null)}
-                    class="bg-emerald-600 text-white font-black text-center py-3.5 rounded-xl shadow-lg hover:bg-emerald-700"
+                    className="bg-emerald-600 text-white font-black text-center py-3.5 rounded-xl shadow-lg hover:bg-emerald-700"
                   >
                     💬 Στείλε WhatsApp Τώρα
                   </a>
-                  <button onClick={() => setActiveAlarm(null)} class="bg-slate-200 font-bold py-3 rounded-xl">
+                  <button onClick={() => setActiveAlarm(null)} className="bg-slate-200 font-bold py-3 rounded-xl">
                     Κλείσιμο
                   </button>
                 </div>
